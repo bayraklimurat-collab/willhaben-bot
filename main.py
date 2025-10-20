@@ -63,4 +63,4 @@ while True:
             print("Yeni ilan gönderildi:", a)
     else:
         print("Yeni ilan yok.")
-    time.sleep(300)  # 5 dakika bekleme
+    time.sleep(60)  # 5 dakika bekleme
