@@ -15,12 +15,15 @@ URL = "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?sor
 sent_ads = set()
 
 def check_ads():
+    # headers'i try dışında da tanımlayabilirsiniz; burada try içine koyduk
     try:
-       headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
-}
-resp = requests.get(URL, headers=headers, timeout=15)
-resp.raise_for_status()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/123.0 Safari/537.36"
+        }
+        resp = requests.get(URL, headers=headers, timeout=15)
+        resp.raise_for_status()
     except Exception as e:
         print("Sayfa okunamadı:", e)
         return []
@@ -46,6 +49,7 @@ def send_telegram(message):
     except Exception as e:
         print("Telegram gönderilemedi:", e)
 
+# web sunucusunu başlat
 keep_alive()
 
 print("Bot başlatıldı, döngü çalışıyor...")
