@@ -53,6 +53,7 @@ def send_telegram(message):
 keep_alive()
 
 print("Bot başlatıldı, döngü çalışıyor...")
+send_telegram("Bot test mesajı")
 while True:
     new = check_ads()
     for a in new:
