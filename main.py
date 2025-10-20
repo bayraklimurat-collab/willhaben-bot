@@ -20,7 +20,7 @@ def check_ads():
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
 }
 resp = requests.get(URL, headers=headers, timeout=15)
-        resp.raise_for_status()
+resp.raise_for_status()
     except Exception as e:
         print("Sayfa okunamadı:", e)
         return []
