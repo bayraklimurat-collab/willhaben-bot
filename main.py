@@ -55,7 +55,12 @@ keep_alive()
 print("Bot başlatıldı, döngü çalışıyor...")
 send_telegram("Bot test mesajı")
 while True:
+    print("Sayfa kontrol ediliyor...")
     new = check_ads()
-    for a in new:
-        send_telegram(a)
-    time.sleep(300)
+    if new:
+        for a in new:
+            send_telegram(a)
+            print("Yeni ilan gönderildi:", a)
+    else:
+        print("Yeni ilan yok.")
+    time.sleep(300)  # 5 dakika bekleme
