@@ -1,5 +1,6 @@
 import os
-import requests
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 import time
 from keep_alive import keep_alive
@@ -15,6 +16,27 @@ URL = "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?sor
 sent_ads = set()
 
 def check_ads():
+    try:
+        options = uc.ChromeOptions()
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        driver = uc.Chrome(options=options)
+
+        driver.get(URL)
+        time.sleep(5)  # sayfanın tam yüklenmesi için bekleme
+        elements = driver.find_elements(By.CLASS_NAME, "aditem-detail-title")
+        new_ads = []
+        for e in elements:
+            href = e.get_attribute("href")
+            if href and href not in sent_ads:
+                sent_ads.add(href)
+                new_ads.append(href)
+        driver.quit()
+        return new_ads
+    except Exception as e:
+        print("Sayfa okunamadı:", e)
+        return []
     # headers'i try dışında da tanımlayabilirsiniz; burada try içine koyduk
     try:
       headers = {
