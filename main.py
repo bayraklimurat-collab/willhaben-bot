@@ -1,9 +1,14 @@
 import os
+import time
+import requests
+from bs4 import BeautifulSoup
+from keep_alive import keep_alive
+
+# Selenium / undetected_chromedriver
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
-from bs4 import BeautifulSoup
-import time
-from keep_alive import keep_alive
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
@@ -16,71 +21,84 @@ URL = "https://www.willhaben.at/iad/gebrauchtwagen/auto/gebrauchtwagenboerse?sor
 sent_ads = set()
 
 def check_ads():
+    """
+    Willhaben sayfasını Selenium (headless) ile açıp ilan linklerini toplayacak.
+    - Chrome headless kullanır (undetected_chromedriver)
+    - Bulunan linklerin href'atlarını kontrol eder.
+    """
+    new_ads = []
+    driver = None
     try:
         options = uc.ChromeOptions()
+        # headless yeni paramı; bazı platformlarda "--headless" kullan
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--start-maximized")
+        options.add_argument("--window-size=1920,1080")
+        # isteğe bağlı: ülke/locale
+        options.add_argument("--lang=de-DE")
+
+        # Başlat
         driver = uc.Chrome(options=options)
 
+        # Git ve bekle (explicit wait)
         driver.get(URL)
-        time.sleep(5)  # sayfanın tam yüklenmesi için bekleme
-        elements = driver.find_elements(By.CLASS_NAME, "aditem-detail-title")
-        new_ads = []
-        for e in elements:
-            href = e.get_attribute("href")
-            if href and href not in sent_ads:
-                sent_ads.add(href)
-                new_ads.append(href)
-        driver.quit()
-        return new_ads
-    except Exception as e:
-        print("Sayfa okunamadı:", e)
-        return []
-    # headers'i try dışında da tanımlayabilirsiniz; burada try içine koyduk
-    try:
-      headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/123.0.0.0 Safari/537.36",
-    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Referer": "https://www.willhaben.at/",
-    "Connection": "keep-alive",
-    "DNT": "1"
-}
-        resp = requests.get(URL, headers=headers, timeout=15)
-        resp.raise_for_status()
-    except Exception as e:
-        print("Sayfa okunamadı:", e)
-        return []
+        # sayfanın dinamik olarak yüklenmesi için bekle (örneğin list öğesi gelene kadar)
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "a[href^='/iad/']"))
+            )
+        except Exception:
+            # bekleme başarısız olsa da devam edeceğiz (sayfa statik olabilir)
+            pass
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    ads = soup.find_all("a", class_="aditem-detail-title")
-    new_ads = []
-    for ad in ads:
-        href = ad.get("href")
-        if not href:
-            continue
-        link = "https://www.willhaben.at" + href
-        if link not in sent_ads:
-            sent_ads.add(link)
-            new_ads.append(link)
-    return new_ads
+        # Tüm linkleri topla (ilan linkleri genelde /iad/ ile başlıyor)
+        elems = driver.find_elements(By.CSS_SELECTOR, "a[href^='/iad/']")
+        for e in elems:
+            href = e.get_attribute("href")
+            if not href:
+                continue
+            # filtre: sadece willhaben içindeki ilana benzeyen linkleri tut
+            if "/iad/gebrauchtwagen/" in href or "/iad/auto/" in href or "/iad/" in href:
+                # normalize: tam url ise olduğu gibi al, yoksa base ile birleştir
+                link = href
+                # uniq ve daha önce yollanmadıysa listele
+                if link not in sent_ads:
+                    sent_ads.add(link)
+                    new_ads.append(link)
+
+        # Güvenlik: eğer çok fazla link varsa kısa tut (isteğe bağlı)
+        # new_ads = new_ads[:30]
+        return new_ads
+
+    except Exception as e:
+        print("Sayfa okunamadı (selenium):", e)
+        return []
+    finally:
+        try:
+            if driver:
+                driver.quit()
+        except Exception:
+            pass
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     try:
-        r = requests.post(url, data={"chat_id": CHAT_ID, "text": message}, timeout=10)
+        r = requests.post(url, data={"chat_id": CHAT_ID, "text": message}, timeout=15)
         print("Telegram response:", r.status_code, r.text)
     except Exception as e:
         print("Telegram gönderilemedi:", e)
 
-# web sunucusunu başlat
+# keep alive webserver
 keep_alive()
 
 print("Bot başlatıldı, döngü çalışıyor...")
-send_telegram("Bot test mesajı")
+# Test bildirimi (isteğe bağlı, deploy sonrası test için)
+# send_telegram("✅ Bot yeniden başlatıldı ve çalışıyor!")
+
 while True:
     print("Sayfa kontrol ediliyor...")
     new = check_ads()
@@ -90,4 +108,4 @@ while True:
             print("Yeni ilan gönderildi:", a)
     else:
         print("Yeni ilan yok.")
-    time.sleep(60)  # 5 dakika bekleme
+    time.sleep(180)  # 3 dakikada bir kontrol (test için daha kısa yapabilirsin)
